@@ -1,0 +1,7 @@
+streamlit
+litellm
+chromadb
+python-dotenv
+jupyter
+jupytext
+numpy
