@@ -33,8 +33,8 @@ load_dotenv("./.env", override=True);
 
 # %%
 url = "https://api.openquran.com"
-intro = "/express/chapter/intro/{ch}"
-verses = "/express/chapter/{ch}:{start}-{end}"
+intro_url = "/express/chapter/intro/{ch}"
+verses_url = "/express/chapter/{ch}:{start}-{end}"
 
 payload = {"en":False,"zk":False,"sc":False,"v5":True,"cn":False,"sp_en":False,"sp_ur":False,"ur":False,"ts":False,"fr":False,"es":False,"de":False,"it":False,"my":False,"f":1,"hover":0}
 
@@ -43,12 +43,17 @@ import requests, json
 
 
 # %%
-def get_ch(n=1):
-    res=requests.post((url+verses).format(ch=n, start=1, end=1000), json=payload)
-    data = json.loads(res.content)
-    res = requests.get((url+intro).format(ch=n))
+def get_ch(n=1, start=1, end=300):
+    vdata = []
+    for s in range(start, end, 10):
+        res=requests.post((url+verses_url).format(ch=n, start=s, end=s+10), json=payload)
+        data = json.loads(res.content)
+        if data == {'message': 'invalid request'}:
+            break
+        vdata.extend(data)
+    res = requests.get((url+intro_url).format(ch=n))
     intro_data = json.loads(res.content)
-    return dict(**intro_data, verses=data)
+    return dict(**intro_data, verses=vdata)
 
 
 # %%
@@ -67,6 +72,9 @@ with open("./quran.json", "w") as f:
 with open('./quran.json', 'r') as f:
     data = json.load(f)
 quran = data = {int(k): v for k,v in data.items()}
+
+# %%
+len(data[5]['verses'])
 
 # %%
 data[1]['verses'][0]
@@ -122,28 +130,27 @@ def get_metadata(ch: dict) -> dict[int, dict[str, str]]:
     return m
 
 get_metadata(data[1])
-            
+
 
 # %% [markdown]
 # ### DB
 
 # %%
 import chromadb
-chroma_client = chromadb.Client()
-
-collection = chroma_client.get_or_create_collection(name="test")
-
-# %%
-c=2
-v = get_verses(quran[c])
-m = get_metadata(quran[c])
+# chroma_client = chromadb.Client()
+chroma_client = chromadb.PersistentClient()
+collection = chroma_client.get_or_create_collection(name="quran")
 
 # %%
-collection.add(
-    ids=['%d:%d'%(c,i) for i in v.keys()],
-    documents=list(v.values()),
-    metadatas=list(m.values())
-)
+for c in range(1, 115):
+    v = get_verses(quran[c])
+    m = get_metadata(quran[c])
+    
+    collection.upsert(
+        ids=['%d:%d'%(c,i) for i in v.keys()],
+        documents=list(v.values()),
+        metadatas=list(m.values())
+    )
 
 # %%
 r=collection.query(query_texts='actions of the people that disobeyed God', n_results=5)
@@ -155,61 +162,59 @@ r['ids']
 # ### LLM
 
 # %%
-prompt=\
-"""\
-You are a scholarly assistant, with expertise in objectively analyzing historical and religious texts.
-You will be provided a some excerpts from a text. Your job is to use the excerpts, and only the excerpts,
-to answer a question.
+from framework import system_prompt as prompt
 
-The excerpts will be provided with their chapter and verse numbers, like following:
 
-    [CHAPTER:VERSE] TEXT
-    [CHAPTER:VERSE] TEXT
-
-Your response must follow this format:
-
-    RESPONSE_TYPE: RESPONSE_VALUE
-
-You have the following choices:
-
-1. If the excerpts provided do not provide enough context, ask for more context by specifying the ranges of verses to retrieve.
-You may ask for multuple excerpts:
-
-    CONTEXT: CHAPTER:VERSE_FROM-VERSE_TO[,CHAPTER:VERSE_FROM:VERSE_TO]
-
-2. If you are able to answer the question:
-
-    ANSWER: YOUR RESPONSE
-
-3. If you are unable to answer the question:
-
-    UNKNOWN:
-
-You may begin with the following excerpt and questions:
-
-<EXCERPT>
-{context}
-</EXCERPT>
-
-<QUESTION>
-{question}
-</QUESTION>
-"""
+# %%
+def find(question, collection, n=10):
+    res = collection.query(query_texts=question, n_results=n)
+    context = '\n'.join('%s: %s' % (res['ids'][0][i], res['documents'][0][i]) for i in range(len(res['ids'])))
+    return context
 
 
 # %%
 def prepare_prompt(question, collection=collection, n=10):
-    res = collection.query(query_texts=question, n_results=n)
-    context = '\n'.join('%s: %s' % (res['ids'][0][i], res['documents'][0][i]) for i in range(len(res)))
+    context = find(question, collection, n=n)
     p = prompt.format(context=context, question=question)
     return p
 
 
 # %%
-p=prepare_prompt('What is the reward for obeying Allah?')
+p=prepare_prompt('What is the story of moses?')
+
+# %%
+print(p)
 
 # %%
 res=completion(model=MODEL_NAME, temperature=0, messages=[{"role": "system", "content":p}])
 
 # %%
 res['choices'][0]['message'].content
+
+
+# %%
+def router(resp: str, collection=collection, **kwargs):
+    kind, val = resp.split(':', maxsplit=1)
+    if kind=='ANSWER':
+        return val
+    elif kind=='FOLLOWUP':
+        return val
+    elif kind=='UNKNOWN':
+        return 'Unable to answer question. Either the lookup failed or the question could not be understood.'
+    elif kind=='FIND':
+        return '<EXCERPT>\n%s\n</EXCERPT>' % find(val, collection, n=kwargs.get('n', 10))
+    elif kind=='CONTEXT':
+        verses = val.strip().split(',')
+        ctx = []
+        for chv in verses:
+            ch, v = chv.strip().split(':')
+            ids = [f'{ch}:{i}' for i in range(max(int(v)-2, 1), int(v)+3)]
+            res = collection.get(ids=ids)
+            if len(res):
+                context = '\n'.join('%s: %s' % (res['ids'][i], res['documents'][i]) for i in range(len(res['ids'])))
+                ctx.append(context)
+        return '<EXCERPT>\n' + '\n'.join(ctx) + '\n</EXCERPT>'
+
+
+# %%
+print(router('FIND: Moses'))
