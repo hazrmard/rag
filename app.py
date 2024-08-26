@@ -58,7 +58,7 @@ if inp:
         st.error(exc)
         raise exc
 
-for msg, display in zip(st.session_state.messages, st.session_state.display):
+for msg, display in zip(st.session_state.messages[1:], st.session_state.display[1:]):
     if not (display or intermediate):
         continue
     with st.chat_message(name=msg["role"]):
