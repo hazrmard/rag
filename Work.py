@@ -28,7 +28,7 @@ MODEL_NAME = "gpt-4o-mini"
 
 load_dotenv("./.env", override=True);
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # ## Download
 
 # %%
@@ -72,12 +72,6 @@ with open("./quran.json", "w") as f:
 with open('./quran.json', 'r') as f:
     data = json.load(f)
 quran = data = {int(k): v for k,v in data.items()}
-
-# %%
-len(data[5]['verses'])
-
-# %%
-data[1]['verses'][0]
 
 # %%
 embedding(model='text-embedding-3-small', input=['yo whats up', 'nothing much bro'])
@@ -162,59 +156,13 @@ r['ids']
 # ### LLM
 
 # %%
-from framework import system_prompt as prompt
-
-
-# %%
-def find(question, collection, n=10):
-    res = collection.query(query_texts=question, n_results=n)
-    context = '\n'.join('%s: %s' % (res['ids'][0][i], res['documents'][0][i]) for i in range(len(res['ids'])))
-    return context
-
-
-# %%
-def prepare_prompt(question, collection=collection, n=10):
-    context = find(question, collection, n=n)
-    p = prompt.format(context=context, question=question)
-    return p
-
-
-# %%
-p=prepare_prompt('What is the story of moses?')
-
-# %%
-print(p)
+from framework import system_prompt as prompt, router, find, get_collection
 
 # %%
 res=completion(model=MODEL_NAME, temperature=0, messages=[{"role": "system", "content":p}])
 
 # %%
 res['choices'][0]['message'].content
-
-
-# %%
-def router(resp: str, collection=collection, **kwargs):
-    kind, val = resp.split(':', maxsplit=1)
-    if kind=='ANSWER':
-        return val
-    elif kind=='FOLLOWUP':
-        return val
-    elif kind=='UNKNOWN':
-        return 'Unable to answer question. Either the lookup failed or the question could not be understood.'
-    elif kind=='FIND':
-        return '<EXCERPT>\n%s\n</EXCERPT>' % find(val, collection, n=kwargs.get('n', 10))
-    elif kind=='CONTEXT':
-        verses = val.strip().split(',')
-        ctx = []
-        for chv in verses:
-            ch, v = chv.strip().split(':')
-            ids = [f'{ch}:{i}' for i in range(max(int(v)-2, 1), int(v)+3)]
-            res = collection.get(ids=ids)
-            if len(res):
-                context = '\n'.join('%s: %s' % (res['ids'][i], res['documents'][i]) for i in range(len(res['ids'])))
-                ctx.append(context)
-        return '<EXCERPT>\n' + '\n'.join(ctx) + '\n</EXCERPT>'
-
 
 # %%
 print(router('FIND: Moses'))
