@@ -59,7 +59,7 @@ if inp:
         raise exc
 
 for msg, display in zip(st.session_state.messages, st.session_state.display):
-    if not display:
+    if not (display or intermediate):
         continue
     with st.chat_message(name=msg["role"]):
         st.write(msg["content"])
