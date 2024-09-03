@@ -176,10 +176,14 @@ for c in trange(1, 115, leave=False):
     )
 
 # %%
+c = [[1,2],[3,4,5]]
+[a for b in c for a in b]
+
+# %%
 r=collection.query(query_texts='actions of the people that disobeyed God', n_results=5)
 
 # %%
-r[0]
+r['metadatas'][0][0]
 
 # %%
 collection.get('53:53')
