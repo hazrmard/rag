@@ -5,3 +5,4 @@ python-dotenv
 jupyter
 jupytext
 numpy
+protobuf~=4.25.4
