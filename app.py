@@ -18,8 +18,10 @@ get_collection = st.cache_resource(get_collection)
 
 st.set_page_config(page_title="Q-bot", page_icon="📖")
 st.caption('AI-powered Quran Assistant. Ask general questions & follow-ups, refer to verses etc.')
+st.caption('For feedback, reach out to [Ibrahim Ahmed](https://iahmed.me)')
 
-testing = st.toggle('Testing?', value=False)
+# testing = st.toggle('Testing?', value=False)
+testing = False
 intermediate = st.toggle('Show intermediate answers?', value=False)
 
 def add_message(role: str, content: str, display: bool=True, store: bool=True):
