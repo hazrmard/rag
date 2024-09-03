@@ -52,7 +52,7 @@ if inp:
 
             result_str, back_to_llm, display_msg = router(response_str, _collection=get_collection())
 
-            add_message("assistant", result_str, display=display_msg or intermediate, store=back_to_llm)
+            add_message("assistant", result_str, display=display_msg, store=back_to_llm)
 
     except Exception as exc:
         st.error(exc)

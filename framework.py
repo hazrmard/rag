@@ -5,7 +5,7 @@ import chromadb
 
 collection_name = "quran"
 filepath = Path(__file__).parent.resolve()
-max_loops = 5
+max_loops = 10
 
 system_prompt=\
 f"""\
@@ -74,6 +74,18 @@ You may begin with the following question:
 """
 
 
+"""
+x. Retrieve related topics. The excerpts have topics labels assigned to them. The topic labels can be used to retrieve
+verses. You may quote the question to get a topic.
+
+    TOPIC: <QUERY STRING TO GET SUITABLE TOPIC LABEL FROM EXCERPTS>
+
+For example,
+
+    TOPIC: What does the Quran say about treating parents?
+"""
+
+
 def get_collection() -> chromadb.Collection:
     chroma_client = chromadb.PersistentClient()
     collection = chroma_client.get_or_create_collection(name=collection_name)
@@ -82,7 +94,8 @@ def get_collection() -> chromadb.Collection:
 
 def find(question: str, collection: chromadb.Collection, n=10) -> str:
     res = collection.query(query_texts=question, n_results=n)
-    context = '\n\n'.join('%s: %s' % (res['ids'][0][i], res['documents'][0][i]) for i in range(len(res['ids'])))
+    res_strs = ['%s: %s' % (res['ids'][0][i], res['documents'][0][i]) for i in range(len(res['ids'][0]))]
+    context = '\n\n'.join(sorted(res_strs))
     return context
 
 
@@ -94,7 +107,7 @@ def _process_answer(ans: str, collection: chromadb.Collection) -> str:
     return ans + '\n\nReferences:\n\n' + res
 
 
-def router(resp: str, _collection=chromadb.Collection, **kwargs) -> tuple[str, bool, bool]: # ans, back_to_llm, display
+def router(resp: str, _collection=chromadb.Collection, context: list[dict[str,str]]=None, **kwargs) -> tuple[str, bool, bool]: # ans, back_to_llm, display
     kind, val = resp.split(':', maxsplit=1)
     if kind=='ANSWER':
         return _process_answer(val, collection=_collection), False, True
