@@ -3,7 +3,6 @@ import sys
 import re
 import chromadb
 
-collection_name = "quran"
 filepath = Path(__file__).parent.resolve()
 max_loops = 10
 
@@ -84,10 +83,13 @@ You may begin with the following question:
 """
 
 
-def get_collection() -> chromadb.Collection:
+def get_collections() -> dict[str, chromadb.Collection]:
     chroma_client = chromadb.PersistentClient()
-    collection = chroma_client.get_or_create_collection(name=collection_name)
-    return collection
+    collections = {'quran': None, 'quran_topics': None}
+    for cname in collections.keys():
+        collection = chroma_client.get_or_create_collection(name=cname)
+        collections[cname] = collection
+    return collections
 
 
 def find(question: str, collection: chromadb.Collection, n=10) -> str:
@@ -99,8 +101,7 @@ def find(question: str, collection: chromadb.Collection, n=10) -> str:
 
 def themes(question: str, collection: chromadb.Collection, n=10) -> str:
     res = collection.query(query_texts=question, n_results=n)
-    theme_strs = [res['metadatas'][0][i]['topics'].split('\n') for i in range(len(res['ids'][0]))]
-    themes = [t for vtheme in theme_strs for t in vtheme]
+    themes = res['documents'][0]
     context = '\n\n'.join(sorted(set(themes)))
     return context
 
@@ -113,20 +114,21 @@ def _process_answer(ans: str, collection: chromadb.Collection) -> str:
     return ans + '\n\nReferences:\n\n' + res
 
 
-def router(resp: str, _collection=chromadb.Collection, **kwargs) -> tuple[str, bool, bool]: # ans, back_to_llm, display
+def router(resp: str, _collections: dict[str, chromadb.Collection], **kwargs) -> tuple[str, bool, bool]: # ans, back_to_llm, display
     kind, val = resp.split(':', maxsplit=1)
     if kind=='ANSWER':
-        return _process_answer(val, collection=_collection), False, True
+        return _process_answer(val, collection=_collections['quran']), False, True
     elif kind=='FOLLOWUP':
         return val, False, True
     elif kind=='FIND':
         res = []
         queries = val.split(',')
         for q in queries:
-            res.append(find(q, collection=_collection, n=kwargs.get('n', 10)))
+            res.append(find(q, collection=_collections['quran'], n=kwargs.get('n', 10)))
+        res = sorted(list(set(res))) # remove duplicate strings
         return '<EXCERPT>\n\n%s\n\n</EXCERPT>' % '\n\n'.join(res), True, False
     elif kind=='THEME':
-        res = themes(q, collection=_collection, n=kwargs.get('n', 10))
+        res = themes(val, collection=_collections['quran_topics'], n=kwargs.get('n', 10))
         return '<THEMES>\n\n%s\n\n</THEMES>' % '\n\n'.join(res), True, False
     elif kind=='CONTEXT':
         verses = val.strip().split(',')
@@ -134,7 +136,7 @@ def router(resp: str, _collection=chromadb.Collection, **kwargs) -> tuple[str, b
         for chv in verses:
             ch, v = chv.strip().split(':')
             ids = [f'{ch}:{i}' for i in range(max(int(v)-2, 1), int(v)+3)]
-            res = _collection.get(ids=ids)
+            res = _collections['quran'].get(ids=ids)
             if len(res):
                 context = '\n'.join('%s: %s' % (res['ids'][i], res['documents'][i]) for i in range(len(res['ids'])))
                 ctx.append(context)

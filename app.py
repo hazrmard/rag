@@ -10,11 +10,11 @@ import streamlit as st
 from dotenv import load_dotenv
 from litellm import completion
 
-from framework import get_collection, router, system_prompt, max_loops
+from framework import get_collections, router, system_prompt, max_loops
 
 load_dotenv("./env", override=True)
 
-get_collection = st.cache_resource(get_collection)
+get_collections = st.cache_resource(get_collections)
 
 st.set_page_config(page_title="Q-bot", page_icon="📖")
 st.caption('AI-powered Quran Assistant. Ask general questions & follow-ups, refer to verses etc.')
@@ -58,7 +58,7 @@ if inp:
             response_str = response.choices[0].message.content
             add_message("assistant", response_str, display=intermediate, store=True)
 
-            result_str, back_to_llm, display_msg = router(response_str, _collection=get_collection())
+            result_str, back_to_llm, display_msg = router(response_str, _collections=get_collections())
 
             add_message("assistant", result_str, display=display_msg, store=back_to_llm)
 

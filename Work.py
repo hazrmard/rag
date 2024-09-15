@@ -112,7 +112,7 @@ def get_topics(q: dict=quran):
                 t_ = sanitize_topic(topic['topic'])
                 t.add(t_)
                 reverse[t_].append('%d:%d'%(v['ch'], v['v']))
-    return t, reverse
+    return sorted(list(t)), reverse
 # t, reverset = get_topics(quran)
 
 
@@ -176,10 +176,6 @@ for c in trange(1, 115, leave=False):
     )
 
 # %%
-c = [[1,2],[3,4,5]]
-[a for b in c for a in b]
-
-# %%
 r=collection.query(query_texts='actions of the people that disobeyed God', n_results=5)
 
 # %%
@@ -202,17 +198,33 @@ topics_collection = chroma_client.get_or_create_collection(name="quran_topics")
 # Prompt --vectorDB--> verses
 
 # %%
-def topic_metadata_to_database(topics, reverse_topics, collection):
-    for t in tqdm(topics, leave=False):
-        t_ = sanitize_topic(t)
-        embed_str = f'What does the Quran say on the topic of: "{t}"'
-        collection.upsert(
-            ids=[t],
-            documents=[embed_str],
-            metadatas={'verse_ids':','.join(reverse_topics[t])}
-        )
+def topic_metadata_to_database(topics, collection):
+    collection.upsert(
+        ids=topics,
+        documents=topics
+    )
 topics, reverse_topics = get_topics(quran)
-topic_metadata_to_database(t, reverse_topics, topics_collection)
+topic_metadata_to_database(topics, topics_collection)
+
+# %%
+r = c['quran_topics'].query(query_texts='repentence, forgiveness', n_results=10)
+
+# %%
+r['documents'][0]
+
+# %% [markdown]
+# ### Querying
+
+# %%
+from framework import get_collections, find, themes
+
+c = get_collections()
+
+# %%
+print(themes('forgiveness', c['quran_topics']))
+
+# %%
+print(find('What is forgiveness?', c['quran']))
 
 # %% [markdown]
 # ### LLM
