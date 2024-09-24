@@ -24,7 +24,7 @@ Excerpts will be provided with their chapter and verse numbers, as follows:
 
 You have the following choices of actions:
 
-1. Find related excerpts. You can look up excerpts multiple times. You must provide a query string 
+1. Find related excerpts by query. You can look up excerpts multiple times. You must provide a query string 
 which will be used to find relevant verses. This is usually the first step. You may use excerpts 
 to help formulate additional lookup queries for more excerpts. The user's question is not a 
 query string. You must turn the question into a query string:
@@ -35,7 +35,7 @@ You may ask for multiple queries:
     
     FIND: <QUERY STRING>, <QUERY STRING>
 
-2. Obtain more context around verses. For example, if a verse in the excerpt ends before finishing 
+2. Obtain more context around verses, or look up verses by number. For example, if a verse in the excerpt ends before finishing 
 an idea, or if it begins mid-thought, you may request surrounding verses. You will be given 2 
 verses before and after the verse in question:
 
@@ -66,18 +66,20 @@ make any additional inferences.
 
 For example, an analysis could comprise of the following actions:
 
-    # Get excerpts
-    FIND: <INITIAL SEARCH QUERY>
-    # Get surrounding verses of a particular verse
-    CONTEXT: <CHAPTER>:<VERSE>
-    # Get theme labels in the texts associated with a query
+    # Always get theme labels in the texts associated with a query to help you find right keywords
     THEME: <QUERY OR KEYWORDS>
-    # Use related themes to make additional search queries
+    # Get excerpts informed by question and themes:
+    FIND: <INITIAL SEARCH QUERY>
+    # Get surrounding verses of a particular verse to understand it better:
+    CONTEXT: <CHAPTER>:<VERSE>
+    # Use related themes to make additional search queries, if needed:
     FIND: <A NEW SEARCH QUERY INFORMED BY RESULTS OF PRIOR ACTIONS>
     # Produce a final objective answer:
     ANSWER: <ANSWER, OR EXPLANATION OF WHY AN ANSWER IS NOT POSSIBLE>
 
 IMPORTANT: You are allowed at most {max_loops} actions. The last action must be ANSWER.
+IMPORTANT: Do not reference verses that are not the result of FIND or CONTEXT actions.
+IMPORTANT: Do NOT make categoral claims if you could not find excerpts. It may be that the search failed.
 
 You may begin with the following question:
 """
@@ -110,7 +112,7 @@ def _process_answer(ans: str, collection: chromadb.Collection) -> str:
     pattern = r'(\d+:\d+)'
     matches = re.findall(pattern=pattern, string=ans)
     vdata = collection.get(ids=list(set(matches)))
-    res = '\n\n'.join('[%s]: %s' % (loc, verse) for loc, verse in zip(matches, vdata['documents']))
+    res = '\n\n'.join('[%s]: %s' % (loc, verse) for loc, verse in zip(vdata['ids'], vdata['documents']))
     return ans + (('\n\nReferences:\n\n' + res) if len(res) else '')
 
 
