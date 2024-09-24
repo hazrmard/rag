@@ -53,7 +53,8 @@ if inp:
             response = completion(
                 model="gpt-4o-mini",
                 messages=[m for i, m in enumerate(st.session_state.messages) if st.session_state.store[i]],
-                mock_response="TESTING: Testing" if testing else None
+                mock_response="TESTING: Testing" if testing else None,
+                temperature=0.
             )
             response_str = response.choices[0].message.content
             add_message("assistant", response_str, display=intermediate, store=True)

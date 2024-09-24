@@ -92,17 +92,17 @@ def get_collections() -> dict[str, chromadb.Collection]:
     return collections
 
 
-def find(question: str, collection: chromadb.Collection, n=10) -> str:
+def find(question: str, collection: chromadb.Collection, n=10) -> list[str]:
     res = collection.query(query_texts=question, n_results=n)
     res_strs = ['%s:%s' % (res['ids'][0][i], res['documents'][0][i]) for i in range(len(res['ids'][0]))]
-    context = '\n\n'.join(set(res_strs))
+    context = list(set(res_strs))
     return context
 
 
-def themes(question: str, collection: chromadb.Collection, n=10) -> str:
+def themes(question: str, collection: chromadb.Collection, n=10) -> list[str]:
     res = collection.query(query_texts=question, n_results=n)
     themes = res['documents'][0]
-    context = '\n\n'.join(sorted(set(themes)))
+    context = list(sorted(set(themes)))
     return context
 
 
@@ -111,7 +111,7 @@ def _process_answer(ans: str, collection: chromadb.Collection) -> str:
     matches = re.findall(pattern=pattern, string=ans)
     vdata = collection.get(ids=list(set(matches)))
     res = '\n\n'.join('[%s]: %s' % (loc, verse) for loc, verse in zip(matches, vdata['documents']))
-    return ans + '\n\nReferences:\n\n' + res
+    return ans + (('\n\nReferences:\n\n' + res) if len(res) else '')
 
 
 def router(resp: str, _collections: dict[str, chromadb.Collection], **kwargs) -> tuple[str, bool, bool]: # ans, back_to_llm, display
@@ -124,12 +124,12 @@ def router(resp: str, _collections: dict[str, chromadb.Collection], **kwargs) ->
         reslist = []
         queries = val.split(',')
         for q in queries:
-            reslist.append(find(q, collection=_collections['quran'], n=kwargs.get('n', 10)))
-        reslist = sorted(list(set(res))) # remove duplicate strings
+            reslist.extend(find(q, collection=_collections['quran'], n=kwargs.get('n', 10)))
+        reslist = list(sorted(set(reslist))) # remove duplicate strings
         return '<EXCERPT>\n\n%s\n\n</EXCERPT>' % '\n\n'.join(reslist), True, False
     elif kind=='THEME':
         res = themes(val, collection=_collections['quran_topics'], n=kwargs.get('n', 10))
-        return '<THEMES>\n\n%s\n\n</THEMES>' % res, True, False
+        return '<THEMES>\n\n%s\n\n</THEMES>' % '\n\n'.join(res), True, False
     elif kind=='CONTEXT':
         verses = val.strip().split(',')
         ctx = []
