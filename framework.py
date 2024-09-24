@@ -121,15 +121,15 @@ def router(resp: str, _collections: dict[str, chromadb.Collection], **kwargs) ->
     elif kind=='FOLLOWUP':
         return val, False, True
     elif kind=='FIND':
-        res = []
+        reslist = []
         queries = val.split(',')
         for q in queries:
-            res.append(find(q, collection=_collections['quran'], n=kwargs.get('n', 10)))
-        res = sorted(list(set(res))) # remove duplicate strings
-        return '<EXCERPT>\n\n%s\n\n</EXCERPT>' % '\n\n'.join(res), True, False
+            reslist.append(find(q, collection=_collections['quran'], n=kwargs.get('n', 10)))
+        reslist = sorted(list(set(res))) # remove duplicate strings
+        return '<EXCERPT>\n\n%s\n\n</EXCERPT>' % '\n\n'.join(reslist), True, False
     elif kind=='THEME':
         res = themes(val, collection=_collections['quran_topics'], n=kwargs.get('n', 10))
-        return '<THEMES>\n\n%s\n\n</THEMES>' % '\n\n'.join(res), True, False
+        return '<THEMES>\n\n%s\n\n</THEMES>' % res, True, False
     elif kind=='CONTEXT':
         verses = val.strip().split(',')
         ctx = []
