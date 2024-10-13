@@ -57,7 +57,13 @@ NOTE: The action of "THEME" responds with theme labels. The action of "FIND" res
 
     FOLLOWUP: <FOLLOW-UP QUESTION TO ASK FOR CLARITY>
 
-5. Make a final answer. If you are able to answer the question, or if repeated FIND, CONTEXT, 
+5. Write out a plan for answering the question. For example what did you observe from the 
+search results? Does it satisfy the user's question? What to do if search results were 
+irrelevant.
+
+    THOUGHT: <YOUR OBSERVATIONS AND PLAN FOR NEXT ACTIONS>
+
+6. Make a final answer. If you are able to answer the question, or if repeated FIND, CONTEXT, 
 and FOLLOWUP actions were insufficient to make an objective answer. The answer must only be 
 based on excerpts, which you must cite as <CHAPTER>:<VERSE>. Do not quote verses. You must not 
 make any additional inferences.
@@ -72,6 +78,8 @@ For example, an analysis could comprise of the following actions:
     FIND: <INITIAL SEARCH QUERY>
     # Get surrounding verses of a particular verse to understand it better:
     CONTEXT: <CHAPTER>:<VERSE>
+    # Write observations about what you have seen before
+    THOUGHT: <YOUR OBSERVATIONS, HIDDEN FROM THE USER>
     # Use related themes to make additional search queries, if needed:
     FIND: <A NEW SEARCH QUERY INFORMED BY RESULTS OF PRIOR ACTIONS>
     # Produce a final objective answer:
@@ -132,6 +140,8 @@ def router(resp: str, _collections: dict[str, chromadb.Collection], **kwargs) ->
     elif kind=='THEME':
         res = themes(val, collection=_collections['quran_topics'], n=kwargs.get('n', 10))
         return '<THEMES>\n\n%s\n\n</THEMES>' % '\n\n'.join(res), True, False
+    elif kind=='THOUGHT':
+        return '', True, False
     elif kind=='CONTEXT':
         verses = val.strip().split(',')
         ctx = []
